@@ -19,7 +19,7 @@ const fmtDate = (d) => {
     return dt.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
   } catch { return String(d).slice(0, 10); }
 };
-const STATUS_LABEL = { upcoming: "即将拍卖", sold: "已成交", unsold: "未成交", withdrawn: "已撤回" };
+const STATUS_LABEL = { upcoming: "即将拍卖", sold: "已成交", unsold: "未成交", withdrawn: "已撤回", collection: "馆藏" };
 
 async function load() {
   try {
@@ -53,8 +53,10 @@ function buildSources() {
 function renderStats() {
   const st = STATS;
   let html = `<div class="stat-card"><div class="num">${ALL.length}</div><div class="lbl">拍品总数</div></div>`;
-  const grotto = ALL.filter((l) => (l.tags || "").includes("grotto")).length;
-  html += `<div class="stat-card"><div class="num" style="color:#8c1d18">${grotto}</div><div class="lbl">石窟寺文物</div></div>`;
+  const grotto = ALL.filter((l) => (l.tags || "").includes("grotto") && !(l.tags || "").includes("cave")).length;
+  const cave = ALL.filter((l) => (l.tags || "").includes("cave")).length;
+  html += `<div class="stat-card"><div class="num" style="color:#8c1d18">${grotto}</div><div class="lbl">石窟寺文物(拍卖)</div></div>`;
+  html += `<div class="stat-card"><div class="num" style="color:#7a5c2e">${cave}</div><div class="lbl">石窟造像(流失馆藏)</div></div>`;
   const bySource = st.by_source || {};
   Object.entries(bySource)
     .sort((a, b) => b[1].count - a[1].count)
@@ -66,7 +68,8 @@ function renderStats() {
 
 function filtered() {
   let list = ALL.slice();
-  if (state.tab === "grotto") list = list.filter((l) => (l.tags || "").includes("grotto"));
+  if (state.tab === "grotto") list = list.filter((l) => (l.tags || "").includes("grotto") && !(l.tags || "").includes("cave"));
+  if (state.tab === "cave") list = list.filter((l) => (l.tags || "").includes("cave"));
   if (state.source) list = list.filter((l) => l.source === state.source);
   if (state.status) list = list.filter((l) => l.status === state.status);
   if (state.search) {
@@ -112,17 +115,23 @@ function renderGrid(items) {
 
 function lotCard(l) {
   const statusBadge = `<span class="badge status ${esc(l.status)}">${STATUS_LABEL[l.status] || l.status}</span>`;
-  const grottoBadge = (l.tags || "").includes("grotto") ? `<span class="badge grotto" style="background:#6b4a2f">🛕 石窟寺</span>` : "";
-  const est = l.estimate_low != null ? `${fmtMoney(l.estimate_low, l.estimate_currency)} - ${fmtMoney(l.estimate_high, l.estimate_currency)}` : "估价未公布";
-  const price = l.sale_price != null && Number(l.sale_price) > 0
-    ? `<div class="lot-price"><b>成交价 ${fmtMoney(l.sale_price, l.price_currency)}</b></div>`
-    : `<div class="lot-price">${esc(est)}</div>`;
-  const img = l.image_url ? `<img class="lot-img" loading="lazy" src="${esc(l.image_url)}" onerror="this.style.display='none'">` : `<div class="lot-img"></div>`;
+  const caveBadge = (l.tags || "").includes("cave") ? `<span class="badge cave" style="background:#7a5c2e">🗿 石窟造像</span>` : "";
+  const grottoBadge = (l.tags || "").includes("grotto") && !(l.tags || "").includes("cave") ? `<span class="badge grotto" style="background:#6b4a2f">🛕 石窟寺</span>` : "";
+  let price;
+  if (l.status === "collection") {
+    price = `<div class="lot-price">现藏:${esc(l.location || "海外馆藏")}</div>`;
+  } else {
+    const est = l.estimate_low != null ? `${fmtMoney(l.estimate_low, l.estimate_currency)} - ${fmtMoney(l.estimate_high, l.estimate_currency)}` : "估价未公布";
+    price = l.sale_price != null && Number(l.sale_price) > 0
+      ? `<div class="lot-price"><b>成交价 ${fmtMoney(l.sale_price, l.price_currency)}</b></div>`
+      : `<div class="lot-price">${esc(est)}</div>`;
+  }
+  const img = l.image_url ? `<img class="lot-img" loading="lazy" referrerpolicy="no-referrer" src="${esc(l.image_url)}" onerror="this.style.display='none'">` : `<div class="lot-img"></div>`;
   const when = state.tab === "new" && l.first_seen ? `<div class="lot-meta">⏱ ${fmtDate(l.first_seen)}</div>` : "";
   return `<div class="lot-card" data-id="${l.id}">
     ${img}
     <div class="lot-body">
-      <div class="lot-meta"><span class="badge ${esc(l.source)}">${esc(l.source.toUpperCase())}</span>${grottoBadge}${statusBadge}${l.lot_number ? `<span>Lot ${esc(l.lot_number)}</span>` : ""}</div>
+      <div class="lot-meta"><span class="badge ${esc(l.source)}">${esc(l.source.toUpperCase())}</span>${caveBadge}${grottoBadge}${statusBadge}${l.lot_number ? `<span>Lot ${esc(l.lot_number)}</span>` : ""}</div>
       <div class="lot-title" title="${esc(l.title)}">${esc(l.title)}</div>
       ${price}
       <div class="lot-meta">${esc(l.sale_title || "")}${l.sale_start_date ? ` · ${fmtDate(l.sale_start_date)}` : ""}</div>
@@ -146,19 +155,25 @@ function openModal(id) {
   const l = ALL.find((x) => x.id === Number(id));
   if (!l) return;
   const statusBadge = `<span class="badge status ${esc(l.status)}">${STATUS_LABEL[l.status] || l.status}</span>`;
-  const est = l.estimate_low != null ? `${fmtMoney(l.estimate_low, l.estimate_currency)} - ${fmtMoney(l.estimate_high, l.estimate_currency)}` : "估价未公布";
-  const priceHtml = l.sale_price != null && Number(l.sale_price) > 0 ? `<div class="field"><span class="k">成交价</span><b>${fmtMoney(l.sale_price, l.price_currency)}</b></div>` : "";
-  const img = l.image_url ? `<img class="modal-img" src="${esc(l.image_url)}">` : "";
+  let priceHtml = "";
+  if (l.status === "collection") {
+    priceHtml = `<div class="field"><span class="k">现藏机构</span><b>${esc(l.location || "海外馆藏")}</b></div>`;
+  } else {
+    const est = l.estimate_low != null ? `${fmtMoney(l.estimate_low, l.estimate_currency)} - ${fmtMoney(l.estimate_high, l.estimate_currency)}` : "估价未公布";
+    priceHtml = `<div class="field"><span class="k">估价</span>${esc(est)}</div>`;
+    if (l.sale_price != null && Number(l.sale_price) > 0)
+      priceHtml += `<div class="field"><span class="k">成交价</span><b>${fmtMoney(l.sale_price, l.price_currency)}</b></div>`;
+  }
+  const img = l.image_url ? `<img class="modal-img" referrerpolicy="no-referrer" src="${esc(l.image_url)}">` : "";
   const desc = l.description ? `<div class="desc">${esc(l.description)}</div>` : "";
-  const link = l.source_url ? `<a href="${esc(l.source_url)}" target="_blank">在官网查看原拍品 →</a>` : "";
+  const link = l.source_url ? `<a href="${esc(l.source_url)}" target="_blank">查看原始资料 →</a>` : "";
   $("#modal-body").innerHTML = `
     <div class="lot-meta"><span class="badge ${esc(l.source)}">${esc(l.source.toUpperCase())}</span>${statusBadge}</div>
     ${img}<h2>${esc(l.title)}</h2>
-    <div class="field"><span class="k">拍品号</span>${esc(l.lot_number || "—")}</div>
-    <div class="field"><span class="k">拍卖会</span>${esc(l.sale_title || "—")}</div>
-    <div class="field"><span class="k">日期</span>${esc(l.sale_start_date ? fmtDate(l.sale_start_date) : "—")}</div>
-    <div class="field"><span class="k">地点</span>${esc(l.location || "—")}</div>
-    <div class="field"><span class="k">估价</span>${esc(est)}</div>
+    <div class="field"><span class="k">拍品号/编号</span>${esc(l.lot_number || "—")}</div>
+    <div class="field"><span class="k">出处/年代</span>${esc(l.sale_title || "—")}</div>
+    ${l.status === "collection" ? "" : `<div class="field"><span class="k">拍卖会</span>${esc(l.sale_title || "—")}</div>`}
+    ${l.sale_start_date ? `<div class="field"><span class="k">日期</span>${esc(fmtDate(l.sale_start_date))}</div>` : ""}
     ${priceHtml}${desc}<div class="field">${link}</div>`;
   $("#modal").classList.remove("hidden");
 }

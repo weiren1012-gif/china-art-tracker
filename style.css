@@ -156,11 +156,21 @@ header h1 { margin: 0; font-size: 20px; }
 .badge.bonhams { background: #1565c0; }
 .badge.dreweatts { background: #00695c; }
 .badge.woolley { background: #4e342e; }
+.badge.artcurial { background: #2e7d32; }
+.badge.tokyochuo { background: #c62828; }
+.badge.seoul { background: #00838f; }
+.badge.kauction { background: #5d4037; }
+.badge.poly { background: #ad1457; }
+.badge.guardian { background: #283593; }
+.badge.tianlongshan { background: #795548; }
+.badge.metmuseum { background: #6a1b9a; }
 .badge.status { opacity: .9; }
 .badge.status.sold { background: var(--sold); }
 .badge.status.unsold { background: var(--unsold); }
 .badge.status.upcoming { background: var(--upcoming); }
 .badge.status.withdrawn { background: #b91c1c; }
+.badge.status.collection { background: #7a5c2e; }
+.tab.cave-tab.active { color: #7a5c2e; }
 
 .pagination { display: flex; gap: 6px; justify-content: center; padding-bottom: 20px; }
 .pagination button {
