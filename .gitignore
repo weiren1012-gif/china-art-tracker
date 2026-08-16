@@ -1,0 +1,13 @@
+venv/
+data/*.db
+data/*.db-*
+data/tunnel.log
+data/ngrok.log
+data/web.log
+data/watchdog.log
+data/tunnel.url
+frpc
+frpc.toml
+*.pyc
+__pycache__/
+gh-pages/

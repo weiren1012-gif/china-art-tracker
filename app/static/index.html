@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中国文物拍卖追踪</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <div class="header-left">
+    <h1>🏛 中国文物拍卖追踪</h1>
+    <span class="subtitle">实时追踪英国主要拍卖行中国文物拍品</span>
+  </div>
+  <div class="header-right">
+    <span id="last-update" class="last-update"></span>
+    <button id="btn-qrcode" class="btn">二维码</button>
+    <button id="btn-refresh" class="btn primary">立即抓取</button>
+  </div>
+</header>
+
+<section class="tabs">
+  <button class="tab active" data-tab="all">全部拍品</button>
+  <button class="tab grotto-tab" data-tab="grotto">🛕 流失海外石窟寺文物</button>
+  <button class="tab" data-tab="new">🆕 新增记录</button>
+</section>
+
+<section id="stats" class="stats"></section>
+
+<section class="toolbar">
+  <input id="search-input" type="text" placeholder="搜索拍品名称 / 描述 / 拍卖会…">
+  <select id="source-select">
+    <option value="">全部拍卖行</option>
+  </select>
+  <select id="status-select">
+    <option value="">全部状态</option>
+    <option value="upcoming">即将拍卖</option>
+    <option value="sold">已成交</option>
+    <option value="unsold">未成交</option>
+    <option value="withdrawn">已撤回</option>
+  </select>
+  <select id="sort-select">
+    <option value="recent">最近更新</option>
+    <option value="price_high">价格从高到低</option>
+    <option value="price_low">价格从低到高</option>
+  </select>
+  <button id="btn-apply" class="btn">应用筛选</button>
+</section>
+
+<section id="results-info" class="results-info"></section>
+<section id="lots" class="lots"></section>
+<div id="pagination" class="pagination"></div>
+<footer id="logs" class="logs"></footer>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-content">
+    <button id="modal-close" class="modal-close">×</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<div id="qr-modal" class="modal hidden">
+  <div class="modal-content qr-content">
+    <button id="qr-close" class="modal-close">×</button>
+    <div class="qr-box">
+      <h3>扫码访问</h3>
+      <img id="qr-img" src="/api/qrcode.png" alt="访问二维码">
+      <p class="qr-url" id="qr-url"></p>
+      <button id="qr-copy" class="btn">复制链接</button>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
