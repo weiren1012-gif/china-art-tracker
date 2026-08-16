@@ -19,7 +19,7 @@ const fmtDate = (d) => {
     return dt.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
   } catch { return String(d).slice(0, 10); }
 };
-const STATUS_LABEL = { upcoming: "即将拍卖", sold: "已成交", unsold: "未成交", withdrawn: "已撤回", collection: "馆藏" };
+const STATUS_LABEL = { upcoming: "即将拍卖", sold: "已成交", unsold: "未成交", withdrawn: "已撤回", collection: "馆藏", lost: "流失/被盗" };
 
 async function load() {
   try {
@@ -53,10 +53,14 @@ function buildSources() {
 function renderStats() {
   const st = STATS;
   let html = `<div class="stat-card"><div class="num">${ALL.length}</div><div class="lbl">拍品总数</div></div>`;
-  const grotto = ALL.filter((l) => (l.tags || "").includes("grotto") && !(l.tags || "").includes("cave")).length;
+  const grotto = ALL.filter((l) => (l.tags || "").includes("grotto") && !(l.tags || "").includes("cave") && !(l.tags || "").includes("lost")).length;
   const cave = ALL.filter((l) => (l.tags || "").includes("cave")).length;
+  const lost = ALL.filter((l) => (l.tags || "").includes("lost")).length;
+  const matched = ALL.filter((l) => (l.tags || "").includes("matched")).length;
   html += `<div class="stat-card"><div class="num" style="color:#8c1d18">${grotto}</div><div class="lbl">石窟寺文物(拍卖)</div></div>`;
   html += `<div class="stat-card"><div class="num" style="color:#7a5c2e">${cave}</div><div class="lbl">石窟造像(流失馆藏)</div></div>`;
+  html += `<div class="stat-card"><div class="num" style="color:#b71c1c">${lost}</div><div class="lbl">被盗(丢失)文物</div></div>`;
+  html += `<div class="stat-card"><div class="num" style="color:#e65100">${matched}</div><div class="lbl">疑似重合匹配</div></div>`;
   const bySource = st.by_source || {};
   Object.entries(bySource)
     .sort((a, b) => b[1].count - a[1].count)
@@ -68,8 +72,10 @@ function renderStats() {
 
 function filtered() {
   let list = ALL.slice();
-  if (state.tab === "grotto") list = list.filter((l) => (l.tags || "").includes("grotto") && !(l.tags || "").includes("cave"));
+  if (state.tab === "grotto") list = list.filter((l) => (l.tags || "").includes("grotto") && !(l.tags || "").includes("cave") && !(l.tags || "").includes("lost"));
   if (state.tab === "cave") list = list.filter((l) => (l.tags || "").includes("cave"));
+  if (state.tab === "lost") list = list.filter((l) => (l.tags || "").includes("lost"));
+  if (state.tab === "matched") list = list.filter((l) => (l.tags || "").includes("matched"));
   if (state.source) list = list.filter((l) => l.source === state.source);
   if (state.status) list = list.filter((l) => l.status === state.status);
   if (state.search) {
@@ -116,10 +122,14 @@ function renderGrid(items) {
 function lotCard(l) {
   const statusBadge = `<span class="badge status ${esc(l.status)}">${STATUS_LABEL[l.status] || l.status}</span>`;
   const caveBadge = (l.tags || "").includes("cave") ? `<span class="badge cave" style="background:#7a5c2e">🗿 石窟造像</span>` : "";
-  const grottoBadge = (l.tags || "").includes("grotto") && !(l.tags || "").includes("cave") ? `<span class="badge grotto" style="background:#6b4a2f">🛕 石窟寺</span>` : "";
+  const lostBadge = (l.tags || "").includes("lost") ? `<span class="badge lost" style="background:#b71c1c">📋 被盗/丢失</span>` : "";
+  const matchedBadge = (l.tags || "").includes("matched") ? `<span class="badge matched" style="background:#e65100">⚠️ 疑似重合</span>` : "";
+  const grottoBadge = (l.tags || "").includes("grotto") && !(l.tags || "").includes("cave") && !(l.tags || "").includes("lost") ? `<span class="badge grotto" style="background:#6b4a2f">🛕 石窟寺</span>` : "";
   let price;
   if (l.status === "collection") {
     price = `<div class="lot-price">现藏:${esc(l.location || "海外馆藏")}</div>`;
+  } else if (l.status === "lost") {
+    price = `<div class="lot-price">被盗/丢失 · ${esc(l.location || "中国")}</div>`;
   } else {
     const est = l.estimate_low != null ? `${fmtMoney(l.estimate_low, l.estimate_currency)} - ${fmtMoney(l.estimate_high, l.estimate_currency)}` : "估价未公布";
     price = l.sale_price != null && Number(l.sale_price) > 0
@@ -127,14 +137,16 @@ function lotCard(l) {
       : `<div class="lot-price">${esc(est)}</div>`;
   }
   const img = l.image_url ? `<img class="lot-img" loading="lazy" referrerpolicy="no-referrer" src="${esc(l.image_url)}" onerror="this.style.display='none'">` : `<div class="lot-img"></div>`;
+  const matchedRef = l.matched_ref ? `<div class="lot-meta" style="color:#e65100">→ 疑似对应:${esc(l.matched_ref)}</div>` : "";
   const when = state.tab === "new" && l.first_seen ? `<div class="lot-meta">⏱ ${fmtDate(l.first_seen)}</div>` : "";
   return `<div class="lot-card" data-id="${l.id}">
     ${img}
     <div class="lot-body">
-      <div class="lot-meta"><span class="badge ${esc(l.source)}">${esc(l.source.toUpperCase())}</span>${caveBadge}${grottoBadge}${statusBadge}${l.lot_number ? `<span>Lot ${esc(l.lot_number)}</span>` : ""}</div>
+      <div class="lot-meta"><span class="badge ${esc(l.source)}">${esc(l.source.toUpperCase())}</span>${caveBadge}${lostBadge}${matchedBadge}${grottoBadge}${statusBadge}${l.lot_number ? `<span>Lot ${esc(l.lot_number)}</span>` : ""}</div>
       <div class="lot-title" title="${esc(l.title)}">${esc(l.title)}</div>
       ${price}
       <div class="lot-meta">${esc(l.sale_title || "")}${l.sale_start_date ? ` · ${fmtDate(l.sale_start_date)}` : ""}</div>
+      ${matchedRef}
       ${when}
     </div>
   </div>`;
@@ -158,11 +170,15 @@ function openModal(id) {
   let priceHtml = "";
   if (l.status === "collection") {
     priceHtml = `<div class="field"><span class="k">现藏机构</span><b>${esc(l.location || "海外馆藏")}</b></div>`;
+  } else if (l.status === "lost") {
+    priceHtml = `<div class="field"><span class="k">被盗地点</span><b>${esc(l.location || "—")}</b></div>`;
+    if (l.matched_ref) priceHtml += `<div class="field"><span class="k">疑似对应</span><b style="color:#e65100">${esc(l.matched_ref)}</b></div>`;
   } else {
     const est = l.estimate_low != null ? `${fmtMoney(l.estimate_low, l.estimate_currency)} - ${fmtMoney(l.estimate_high, l.estimate_currency)}` : "估价未公布";
     priceHtml = `<div class="field"><span class="k">估价</span>${esc(est)}</div>`;
     if (l.sale_price != null && Number(l.sale_price) > 0)
       priceHtml += `<div class="field"><span class="k">成交价</span><b>${fmtMoney(l.sale_price, l.price_currency)}</b></div>`;
+    if (l.matched_ref) priceHtml += `<div class="field"><span class="k">疑似对应</span><b style="color:#e65100">${esc(l.matched_ref)}</b></div>`;
   }
   const img = l.image_url ? `<img class="modal-img" referrerpolicy="no-referrer" src="${esc(l.image_url)}">` : "";
   const desc = l.description ? `<div class="desc">${esc(l.description)}</div>` : "";

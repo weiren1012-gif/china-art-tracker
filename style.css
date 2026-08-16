@@ -170,7 +170,10 @@ header h1 { margin: 0; font-size: 20px; }
 .badge.status.upcoming { background: var(--upcoming); }
 .badge.status.withdrawn { background: #b91c1c; }
 .badge.status.collection { background: #7a5c2e; }
+.badge.status.lost { background: #b71c1c; }
 .tab.cave-tab.active { color: #7a5c2e; }
+.tab.lost-tab.active { color: #b71c1c; }
+.tab.matched-tab.active { color: #e65100; }
 
 .pagination { display: flex; gap: 6px; justify-content: center; padding-bottom: 20px; }
 .pagination button {
