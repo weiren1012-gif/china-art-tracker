@@ -235,6 +235,34 @@ header h1 { margin: 0; font-size: 20px; }
   .match-arrow { transform: rotate(90deg); padding: 4px 0; }
 }
 
+/* 详细对比分析弹窗 */
+.md-compare { display: flex; gap: 14px; }
+.md-col { flex: 1; min-width: 0; padding: 12px; border-radius: 8px; }
+.md-col.lost { background: #fdf2f2; border: 1px solid #f0c4c4; }
+.md-col.auc { background: #f2f7fd; border: 1px solid #c4d8f0; }
+.md-img { width: 100%; max-height: 320px; object-fit: contain; border-radius: 6px; background: #fff; }
+.md-col .field { font-size: 12.5px; margin: 5px 0; }
+.md-col .field .k { color: var(--muted); margin-right: 6px; }
+.detail-block { margin-top: 8px; font-size: 12.5px; line-height: 1.7; color: #4a3b28; white-space: pre-wrap; word-break: break-word; }
+.detail-block .kf { margin: 3px 0; }
+.md-algo { margin-top: 14px; padding: 12px 16px; background: #faf6ee; border: 1px solid var(--line); border-radius: 8px; }
+.md-algo h3 { margin: 4px 0 8px; font-size: 14px; color: var(--accent); }
+.algo-text { font-size: 12.5px; line-height: 1.8; color: #5a4a2a; }
+.algo-text p { margin: 6px 0; }
+.match-detail-btn {
+  margin-left: auto;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+@media (max-width: 640px) {
+  .md-compare { flex-direction: column; }
+}
+
 .pagination { display: flex; gap: 6px; justify-content: center; padding-bottom: 20px; }
 .pagination button {
   border: 1px solid var(--line);

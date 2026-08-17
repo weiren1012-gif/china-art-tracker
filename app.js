@@ -132,12 +132,11 @@ function renderMatches() {
     grid.innerHTML = `<div class="empty">暂无匹配结果</div>`;
     return;
   }
-  grid.innerHTML = MATCHES.map(matchCard).join("");
-  grid.querySelectorAll(".auction-side").forEach((el) => el.addEventListener("click", () => openModal(Number(el.dataset.id))));
-  grid.querySelectorAll(".lost-side").forEach((el) => el.addEventListener("click", () => openModal(Number(el.dataset.id))));
+  grid.innerHTML = MATCHES.map((m, i) => matchCard(m, i)).join("");
+  grid.querySelectorAll(".match-detail-btn").forEach((el) => el.addEventListener("click", () => openMatchDetail(Number(el.dataset.midx))));
 }
 
-function matchCard(m) {
+function matchCard(m, idx) {
   const lostImg = m.lost_img ? `<img class="cmp-img" referrerpolicy="no-referrer" src="${esc(m.lost_img)}" onerror="this.style.visibility='hidden'">` : `<div class="cmp-img none">无图</div>`;
   const aucImg = m.auc_img ? `<img class="cmp-img" referrerpolicy="no-referrer" src="${esc(m.auc_img)}" onerror="this.style.visibility='hidden'">` : `<div class="cmp-img none">无图</div>`;
   const aucPrice = m.sale_price != null && Number(m.sale_price) > 0
@@ -152,7 +151,7 @@ function matchCard(m) {
       <span class="match-score">匹配得分 ${m.score.toFixed(1)}</span>
     </div>
     <div class="match-cols">
-      <div class="match-side lost-side" data-id="${m.lost_id}">
+      <div class="match-side lost-side">
         <div class="side-label">📋 被盗/丢失文物</div>
         ${lostImg}
         <div class="cmp-title">${esc(m.lost_title)}</div>
@@ -160,7 +159,7 @@ function matchCard(m) {
         <div class="cmp-meta">${esc(m.lost_location || "")}</div>
       </div>
       <div class="match-arrow">⟷</div>
-      <div class="match-side auction-side" data-id="${m.auction_id}">
+      <div class="match-side auction-side">
         <div class="side-label">🏛 海外拍卖拍品</div>
         ${aucImg}
         <div class="cmp-title">${esc(m.auc_title)}</div>
@@ -170,6 +169,7 @@ function matchCard(m) {
     </div>
     <div class="match-reasons">
       <span class="match-label">判断依据:</span>${imgSim}${reasons}
+      <button class="match-detail-btn" data-midx="${idx}">🔍 查看详细对比分析</button>
     </div>
   </div>`;
 }
@@ -232,6 +232,14 @@ function renderPagination(pages) {
 function openModal(id) {
   const l = ALL.find((x) => x.id === Number(id));
   if (!l) return;
+  // 若该拍品有疑似重合匹配,直接打开详细对比分析
+  if (l.matched_ref) {
+    const idx = MATCHES.findIndex((m) => m.auction_id === Number(id));
+    if (idx >= 0) {
+      openMatchDetail(idx);
+      return;
+    }
+  }
   const statusBadge = `<span class="badge status ${esc(l.status)}">${STATUS_LABEL[l.status] || l.status}</span>`;
   let priceHtml = "";
   if (l.status === "collection") {
@@ -264,6 +272,64 @@ function setTab(tab) {
   state.tab = tab; state.page = 1;
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
   render();
+}
+
+function openMatchDetail(idx) {
+  const m = MATCHES[idx];
+  if (!m) return;
+  const lostDesc = (m.lost_desc || "").split("\n").map((l) => `<div class="kf">${esc(l)}</div>`).join("");
+  const aucDesc = m.auc_desc ? `<div class="detail-block">${esc(m.auc_desc)}</div>` : "";
+  const lostImg = m.lost_img ? `<img class="md-img" referrerpolicy="no-referrer" src="${esc(m.lost_img)}">` : `<div class="cmp-img none">无图</div>`;
+  const aucImg = m.auc_img ? `<img class="md-img" referrerpolicy="no-referrer" src="${esc(m.auc_img)}">` : `<div class="cmp-img none">无图</div>`;
+  const aucPrice = m.sale_price != null && Number(m.sale_price) > 0
+    ? `<div class="field"><span class="k">成交价</span><b>${fmtMoney(m.sale_price, m.price_currency)}</b></div>`
+    : (m.estimate_low != null ? `<div class="field"><span class="k">估价</span>${fmtMoney(m.estimate_low, m.estimate_currency)} - ${fmtMoney(m.estimate_high, m.estimate_currency)}</div>` : "");
+  const reasons = (m.reasons || "").split(",").map((r) => `<span class="reason">${esc(r)}</span>`).join("");
+  const imgSimHtml = m.image_sim != null
+    ? `<div class="field"><span class="k">图片相似度</span><b>${(m.image_sim * 100).toFixed(0)}%</b>(感知哈希比对)</div>`
+    : `<div class="field"><span class="k">图片比对</span>候选图片未提供/不可下载,已以文本检索为准</div>`;
+  $("#modal-body").innerHTML = `
+    <h2 style="margin-bottom:2px">🔍 疑似重合 · 详细对比分析</h2>
+    <div class="field" style="margin:4px 0 12px">
+      <span class="badge status" style="background:#b71c1c">📋 被盗/丢失文物</span>
+      <span style="color:var(--muted)">⟷</span>
+      <span class="badge ${esc(m.auc_source)}">🏛 ${esc((m.auc_source || "").toUpperCase())}</span>
+      <span class="badge status" style="background:#e65100">匹配得分 ${m.score.toFixed(1)}</span>
+    </div>
+    <div class="md-compare">
+      <div class="md-col lost">
+        <div class="side-label">📋 被盗/丢失文物(公安部·国家文物局)</div>
+        ${lostImg}
+        <div class="cmp-title">${esc(m.lost_title)}</div>
+        <div class="field"><span class="k">发布编号</span>${esc(m.lost_no || "—")}</div>
+        <div class="field"><span class="k">类型/年代</span>${esc(m.lost_year || "—")}</div>
+        <div class="field"><span class="k">被盗地点</span>${esc(m.lost_location || "—")}</div>
+        <div class="detail-block">${lostDesc}</div>
+      </div>
+      <div class="md-col auc">
+        <div class="side-label">🏛 海外拍卖拍品</div>
+        ${aucImg}
+        <div class="cmp-title">${esc(m.auc_title)}</div>
+        <div class="field"><span class="k">拍卖行</span>${esc(m.auc_source)}</div>
+        <div class="field"><span class="k">状态</span>${STATUS_LABEL[m.auc_status] || m.auc_status}</div>
+        <div class="field"><span class="k">拍卖会</span>${esc(m.auc_sale || "—")}</div>
+        <div class="field"><span class="k">拍品号</span>${esc(m.auc_no || "—")}</div>
+        ${aucPrice}
+        ${aucDesc}
+      </div>
+    </div>
+    <div class="md-algo">
+      <h3>判断依据</h3>
+      <div class="field">${imgSimHtml}</div>
+      <div class="field"><span class="k">文本命中关键词</span>${reasons || "—"}</div>
+      <h3 style="margin-top:14px">匹配算法说明</h3>
+      <div class="algo-text">
+        <p><b>① 文本信息检索(跨语言):</b>建立中英文文物类型关键词映射表(60余组,如「佛头」↔「head of buddha」、「石狮」↔「stone lion」、「壁画」↔「mural」),将被盗文物中文名称映射为英文检索词,在海外拍卖标题/描述中检索命中。计分规则:强特征词命中 +3.5 分,普通词 +1.5 分,多关键词命中额外 +2 分,中文名称相似度(difflib 序列匹配)加权;同时排除明确标注日本/印度/泰国等非中国来源的拍品。</p>
+        <p><b>② 图像感知哈希(pHash):</b>将图片缩放到 64×64 并转灰度,计算 DCT 感知哈希指纹,比较被盗文物图片与拍卖图片的汉明距离,距离越小越相似,相似度越高计分越高。</p>
+        <p><b>③ 综合判定:</b>文本得分 + 图片得分,超过阈值即判定为「疑似重合」。本结果为算法自动匹配的<b>疑似提示</b>,用于辅助研判,不构成真伪认定。最终需人工结合尺寸、工艺特征、出处、被盗记录等综合认定。</p>
+      </div>
+    </div>`;
+  $("#modal").classList.remove("hidden");
 }
 
 function init() {
