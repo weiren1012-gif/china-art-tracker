@@ -99,16 +99,14 @@ function render() {
     renderMatches();
     return;
   }
+  if (state.tab === "watch") {
+    renderWatch();
+    return;
+  }
   let list = filtered();
   if (state.tab === "new") {
     list = list.sort((a, b) => (b.first_seen || "").localeCompare(a.first_seen || "")).slice(0, 200);
     $("#results-info").textContent = `最近新增记录(按首次发现时间)`;
-  } else if (state.tab === "watch") {
-    list = list.sort((a, b) => (a.sale_start_date || "9999").localeCompare(b.sale_start_date || "9999"));
-    $("#results-info").textContent = `重点预警:即将拍卖的疑似中国文物 ${list.length} 件(按开拍时间排序)`;
-    $("#pagination").innerHTML = "";
-    renderGrid(list);
-    return;
   } else {
     const total = list.length;
     const pages = Math.max(1, Math.ceil(total / state.pageSize));
@@ -122,6 +120,62 @@ function render() {
   }
   $("#pagination").innerHTML = "";
   renderGrid(list.slice(0, 200));
+}
+
+function renderWatch() {
+  const grid = $("#lots");
+  $("#pagination").innerHTML = "";
+  const watchLots = ALL.filter((l) => (l.tags || "").includes("watch"));
+  if (!watchLots.length) {
+    $("#results-info").textContent = "重点预警:暂无疑似流失文物即将开拍";
+    grid.innerHTML = `<div class="empty">当前没有被盗/丢失文物库中的文物出现在即将开拍的拍品中。</div>`;
+    return;
+  }
+  $("#results-info").textContent = `🚨 重点预警:${watchLots.length} 件疑似流失文物即将开拍`;
+  grid.innerHTML = watchLots.map((l) => watchCard(l)).join("");
+  grid.querySelectorAll(".match-detail-btn").forEach((el) => el.addEventListener("click", () => openMatchDetail(Number(el.dataset.midx))));
+}
+
+function watchCard(l) {
+  const m = MATCHES.find((x) => x.auction_id === Number(l.id));
+  if (!m) {
+    return lotCard(l);
+  }
+  const lostImg = m.lost_img ? `<img class="watch-img" referrerpolicy="no-referrer" src="${esc(m.lost_img)}" onerror="this.style.visibility='hidden'">` : `<div class="cmp-img none">无图</div>`;
+  const aucImg = m.auc_img ? `<img class="watch-img" referrerpolicy="no-referrer" src="${esc(m.auc_img)}" onerror="this.style.visibility='hidden'">` : `<div class="cmp-img none">无图</div>`;
+  const reasons = (m.reasons || "").split(",").map((r) => `<span class="reason">${esc(r)}</span>`).join("");
+  const saleTime = l.sale_start_date ? fmtDate(l.sale_start_date) : "时间待定";
+  const aucPrice = m.sale_price != null && Number(m.sale_price) > 0
+    ? `成交价 ${fmtMoney(m.sale_price, m.price_currency)}`
+    : (m.estimate_low != null ? `估价 ${fmtMoney(m.estimate_low, m.estimate_currency)} - ${fmtMoney(m.estimate_high, m.estimate_currency)}` : "估价未公布");
+  const midx = MATCHES.findIndex((x) => x.auction_id === Number(l.id));
+  return `<div class="watch-card">
+    <div class="watch-head">
+      <span class="watch-alert">🚨 重点预警</span>
+      <span class="watch-sale">即将开拍:${esc(saleTime)}</span>
+    </div>
+    <div class="watch-cols">
+      <div class="watch-side lost">
+        <div class="side-label">📋 被盗/丢失文物(公安部·国家文物局)</div>
+        ${lostImg}
+        <div class="cmp-title">${esc(m.lost_title)}</div>
+        <div class="cmp-meta">编号 ${esc(m.lost_no || "—")} · ${esc(m.lost_year || "")}</div>
+        <div class="cmp-meta">被盗地点:${esc(m.lost_location || "—")}</div>
+      </div>
+      <div class="watch-vs">疑似 ⟷</div>
+      <div class="watch-side auc">
+        <div class="side-label">🏛 即将开拍拍品</div>
+        ${aucImg}
+        <div class="cmp-title">${esc(m.auc_title)}</div>
+        <div class="cmp-meta">${esc(m.auc_source)} · ${esc(m.auc_sale || "")}</div>
+        <div class="cmp-meta">${esc(aucPrice)}</div>
+      </div>
+    </div>
+    <div class="match-reasons">
+      <span class="match-label">判断依据:</span>${reasons}
+      <button class="match-detail-btn" data-midx="${midx}">🔍 查看详细对比分析</button>
+    </div>
+  </div>`;
 }
 
 function renderMatches() {
