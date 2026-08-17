@@ -24,7 +24,7 @@ const STATUS_LABEL = { upcoming: "即将拍卖", sold: "已成交", unsold: "未
 
 async function load() {
   try {
-    const r = await fetch("data/lots.json");
+    const r = await fetch(`data/lots.json?t=${Date.now()}`);
     const data = await r.json();
     ALL.length = 0;
     data.lots.forEach((l) => ALL.push(l));
