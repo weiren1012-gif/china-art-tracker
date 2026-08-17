@@ -174,6 +174,66 @@ header h1 { margin: 0; font-size: 20px; }
 .tab.cave-tab.active { color: #7a5c2e; }
 .tab.lost-tab.active { color: #b71c1c; }
 .tab.matched-tab.active { color: #e65100; }
+.tab.watch-tab.active { color: #c62828; }
+
+/* 疑似重合对照卡片 */
+.match-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  grid-column: 1/-1;
+}
+.match-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: #fff3e0;
+  border-bottom: 1px solid #ffcc80;
+}
+.match-badge { font-weight: 700; color: #e65100; }
+.match-score { font-size: 13px; color: #8a5a00; }
+.match-cols { display: flex; gap: 0; align-items: stretch; }
+.match-side { flex: 1; padding: 14px; min-width: 0; cursor: pointer; }
+.match-side.lost-side { background: #fdf2f2; }
+.match-side.auction-side { background: #f2f7fd; }
+.match-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: var(--muted);
+  padding: 0 6px;
+}
+.side-label { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
+.cmp-img { width: 100%; height: 160px; object-fit: contain; background: #f5f5f0; border-radius: 6px; }
+.cmp-img.none { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; }
+.cmp-title { font-size: 13px; font-weight: 600; line-height: 1.4; margin-top: 8px; }
+.cmp-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.match-reasons {
+  padding: 10px 16px;
+  border-top: 1px dashed var(--line);
+  font-size: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.match-label { color: var(--muted); font-weight: 700; margin-right: 4px; }
+.reason {
+  display: inline-block;
+  background: #efe9dc;
+  color: #5a4a2a;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+@media (max-width: 640px) {
+  .match-cols { flex-direction: column; }
+  .match-arrow { transform: rotate(90deg); padding: 4px 0; }
+}
 
 .pagination { display: flex; gap: 6px; justify-content: center; padding-bottom: 20px; }
 .pagination button {

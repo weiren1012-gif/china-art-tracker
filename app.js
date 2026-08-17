@@ -1,6 +1,7 @@
 const ALL = [];
 let STATS = {};
 let UPDATED = "";
+let MATCHES = [];
 let state = { tab: "all", page: 1, pageSize: 24, search: "", source: "", status: "", sort: "recent" };
 
 const $ = (s) => document.querySelector(s);
@@ -29,6 +30,7 @@ async function load() {
     data.lots.forEach((l) => ALL.push(l));
     STATS = data.stats || {};
     UPDATED = data.updated || "";
+    MATCHES = data.matches || [];
     $("#last-update").textContent = UPDATED ? `数据更新于 ${new Date(UPDATED).toLocaleString("zh-CN")}` : "";
     buildSources();
     renderStats();
@@ -61,6 +63,8 @@ function renderStats() {
   html += `<div class="stat-card"><div class="num" style="color:#7a5c2e">${cave}</div><div class="lbl">石窟造像(流失馆藏)</div></div>`;
   html += `<div class="stat-card"><div class="num" style="color:#b71c1c">${lost}</div><div class="lbl">被盗(丢失)文物</div></div>`;
   html += `<div class="stat-card"><div class="num" style="color:#e65100">${matched}</div><div class="lbl">疑似重合匹配</div></div>`;
+  const watch = ALL.filter((l) => (l.tags || "").includes("watch")).length;
+  html += `<div class="stat-card"><div class="num" style="color:#c62828">${watch}</div><div class="lbl">重点预警</div></div>`;
   const bySource = st.by_source || {};
   Object.entries(bySource)
     .sort((a, b) => b[1].count - a[1].count)
@@ -76,6 +80,7 @@ function filtered() {
   if (state.tab === "cave") list = list.filter((l) => (l.tags || "").includes("cave"));
   if (state.tab === "lost") list = list.filter((l) => (l.tags || "").includes("lost"));
   if (state.tab === "matched") list = list.filter((l) => (l.tags || "").includes("matched"));
+  if (state.tab === "watch") list = list.filter((l) => (l.tags || "").includes("watch"));
   if (state.source) list = list.filter((l) => l.source === state.source);
   if (state.status) list = list.filter((l) => l.status === state.status);
   if (state.search) {
@@ -90,10 +95,20 @@ function filtered() {
 }
 
 function render() {
+  if (state.tab === "matched") {
+    renderMatches();
+    return;
+  }
   let list = filtered();
   if (state.tab === "new") {
     list = list.sort((a, b) => (b.first_seen || "").localeCompare(a.first_seen || "")).slice(0, 200);
     $("#results-info").textContent = `最近新增记录(按首次发现时间)`;
+  } else if (state.tab === "watch") {
+    list = list.sort((a, b) => (a.sale_start_date || "9999").localeCompare(b.sale_start_date || "9999"));
+    $("#results-info").textContent = `重点预警:即将拍卖的疑似中国文物 ${list.length} 件(按开拍时间排序)`;
+    $("#pagination").innerHTML = "";
+    renderGrid(list);
+    return;
   } else {
     const total = list.length;
     const pages = Math.max(1, Math.ceil(total / state.pageSize));
@@ -107,6 +122,56 @@ function render() {
   }
   $("#pagination").innerHTML = "";
   renderGrid(list.slice(0, 200));
+}
+
+function renderMatches() {
+  const grid = $("#lots");
+  $("#results-info").textContent = `疑似重合匹配 ${MATCHES.length} 组(左:被盗/丢失文物 · 右:海外拍卖拍品)`;
+  $("#pagination").innerHTML = "";
+  if (!MATCHES.length) {
+    grid.innerHTML = `<div class="empty">暂无匹配结果</div>`;
+    return;
+  }
+  grid.innerHTML = MATCHES.map(matchCard).join("");
+  grid.querySelectorAll(".auction-side").forEach((el) => el.addEventListener("click", () => openModal(Number(el.dataset.id))));
+  grid.querySelectorAll(".lost-side").forEach((el) => el.addEventListener("click", () => openModal(Number(el.dataset.id))));
+}
+
+function matchCard(m) {
+  const lostImg = m.lost_img ? `<img class="cmp-img" referrerpolicy="no-referrer" src="${esc(m.lost_img)}" onerror="this.style.visibility='hidden'">` : `<div class="cmp-img none">无图</div>`;
+  const aucImg = m.auc_img ? `<img class="cmp-img" referrerpolicy="no-referrer" src="${esc(m.auc_img)}" onerror="this.style.visibility='hidden'">` : `<div class="cmp-img none">无图</div>`;
+  const aucPrice = m.sale_price != null && Number(m.sale_price) > 0
+    ? `成交价 ${fmtMoney(m.sale_price, m.price_currency)}`
+    : (m.estimate_low != null ? `估价 ${fmtMoney(m.estimate_low, m.estimate_currency)}-${fmtMoney(m.estimate_high, m.estimate_currency)}` : "价格未公布");
+  const reasons = (m.reasons || "").split(",").map((r) => `<span class="reason">${esc(r)}</span>`).join("");
+  const imgSim = m.image_sim != null ? `<span class="reason" style="background:#e65100">图片相似度 ${(m.image_sim * 100).toFixed(0)}%</span>` : "";
+  const matchType = m.image_sim != null && m.image_sim > 0.6 ? "高度疑似" : "疑似";
+  return `<div class="match-card">
+    <div class="match-head">
+      <span class="match-badge">⚠️ ${matchType}重合</span>
+      <span class="match-score">匹配得分 ${m.score.toFixed(1)}</span>
+    </div>
+    <div class="match-cols">
+      <div class="match-side lost-side" data-id="${m.lost_id}">
+        <div class="side-label">📋 被盗/丢失文物</div>
+        ${lostImg}
+        <div class="cmp-title">${esc(m.lost_title)}</div>
+        <div class="cmp-meta">编号 ${esc(m.lost_no || "—")} · ${esc(m.lost_year || "")}</div>
+        <div class="cmp-meta">${esc(m.lost_location || "")}</div>
+      </div>
+      <div class="match-arrow">⟷</div>
+      <div class="match-side auction-side" data-id="${m.auction_id}">
+        <div class="side-label">🏛 海外拍卖拍品</div>
+        ${aucImg}
+        <div class="cmp-title">${esc(m.auc_title)}</div>
+        <div class="cmp-meta">${esc(m.auc_source)} · ${STATUS_LABEL[m.auc_status] || m.auc_status}</div>
+        <div class="cmp-meta">${esc(aucPrice)} · ${esc(m.auc_sale || "")}</div>
+      </div>
+    </div>
+    <div class="match-reasons">
+      <span class="match-label">判断依据:</span>${imgSim}${reasons}
+    </div>
+  </div>`;
 }
 
 function renderGrid(items) {
@@ -124,6 +189,7 @@ function lotCard(l) {
   const caveBadge = (l.tags || "").includes("cave") ? `<span class="badge cave" style="background:#7a5c2e">🗿 石窟造像</span>` : "";
   const lostBadge = (l.tags || "").includes("lost") ? `<span class="badge lost" style="background:#b71c1c">📋 被盗/丢失</span>` : "";
   const matchedBadge = (l.tags || "").includes("matched") ? `<span class="badge matched" style="background:#e65100">⚠️ 疑似重合</span>` : "";
+  const watchBadge = (l.tags || "").includes("watch") ? `<span class="badge watch" style="background:#c62828">🚨 重点预警</span>` : "";
   const grottoBadge = (l.tags || "").includes("grotto") && !(l.tags || "").includes("cave") && !(l.tags || "").includes("lost") ? `<span class="badge grotto" style="background:#6b4a2f">🛕 石窟寺</span>` : "";
   let price;
   if (l.status === "collection") {
@@ -142,7 +208,7 @@ function lotCard(l) {
   return `<div class="lot-card" data-id="${l.id}">
     ${img}
     <div class="lot-body">
-      <div class="lot-meta"><span class="badge ${esc(l.source)}">${esc(l.source.toUpperCase())}</span>${caveBadge}${lostBadge}${matchedBadge}${grottoBadge}${statusBadge}${l.lot_number ? `<span>Lot ${esc(l.lot_number)}</span>` : ""}</div>
+      <div class="lot-meta"><span class="badge ${esc(l.source)}">${esc(l.source.toUpperCase())}</span>${caveBadge}${lostBadge}${matchedBadge}${watchBadge}${grottoBadge}${statusBadge}${l.lot_number ? `<span>Lot ${esc(l.lot_number)}</span>` : ""}</div>
       <div class="lot-title" title="${esc(l.title)}">${esc(l.title)}</div>
       ${price}
       <div class="lot-meta">${esc(l.sale_title || "")}${l.sale_start_date ? ` · ${fmtDate(l.sale_start_date)}` : ""}</div>
